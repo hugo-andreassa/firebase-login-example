@@ -34,7 +34,6 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         mAuth = FirebaseAuth.getInstance();
-        FirebaseUser currentUser = mAuth.getCurrentUser();
 
         progressBar = findViewById(R.id.progress_bar_login);
         progressBar.setVisibility(View.INVISIBLE);
@@ -68,16 +67,19 @@ public class MainActivity extends AppCompatActivity {
                                 // Sign in success, update UI with the signed-in user's information
                                 Log.d("ACT", "Login realizado com sucesso");
                                 FirebaseUser user = mAuth.getCurrentUser();
-                                progressBar.setVisibility(View.INVISIBLE);
+
                                 loginButton.setEnabled(true);
+                                progressBar.setVisibility(View.INVISIBLE);
+
                                 Toast.makeText(getApplicationContext(),
                                         "Login realizado com sucesso", Toast.LENGTH_SHORT).show();
                             } else {
                                 // If sign in fails, display a message to the user.
                                 Log.w("ACT", "signInWithEmail:failure", task.getException());
                                 loginButton.setEnabled(true);
+                                progressBar.setVisibility(View.INVISIBLE);
                                 Toast.makeText(getApplicationContext(),
-                                        "Erro no login", Toast.LENGTH_SHORT).show();
+                                        task.getException().getMessage(), Toast.LENGTH_SHORT).show();
                             }
                         }
                     });
