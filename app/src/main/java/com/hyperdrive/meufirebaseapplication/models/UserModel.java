@@ -1,15 +1,15 @@
 package com.hyperdrive.meufirebaseapplication.models;
 
-import androidx.multidex.MultiDexApplication;
+import java.io.Serializable;
 
-public class UserModel {
+public class UserModel implements Serializable {
 
     private String id;
     private String name;
     private String email;
     private String password;
     private String phone;
-    private Integer birthdayMonth;
+    private String birthdayMonth;
     private String street;
     private String city;
     private String number;
@@ -21,7 +21,7 @@ public class UserModel {
     }
 
     public UserModel(String id, String name, String email, String password, String phone,
-                     Integer birthdayMonth, String street, String city,
+                     String birthdayMonth, String street, String city,
                      String number, String comp, String cep, String geographicPoint) {
         this.id = id;
         this.name = name;
@@ -77,11 +77,11 @@ public class UserModel {
         this.phone = phone;
     }
 
-    public Integer getBirthdayMonth() {
+    public String getBirthdayMonth() {
         return birthdayMonth;
     }
 
-    public void setBirthdayMonth(Integer birthdayMonth) {
+    public void setBirthdayMonth(String birthdayMonth) {
         this.birthdayMonth = birthdayMonth;
     }
 

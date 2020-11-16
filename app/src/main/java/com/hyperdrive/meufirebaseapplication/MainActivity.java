@@ -1,6 +1,5 @@
 package com.hyperdrive.meufirebaseapplication;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.FragmentTransaction;
 
@@ -11,22 +10,19 @@ import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
-import com.google.android.material.textfield.TextInputEditText;
-import com.google.firebase.FirebaseApp;
-import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.hyperdrive.meufirebaseapplication.models.LoginModel;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.hyperdrive.meufirebaseapplication.models.UserModel;
 
 public class MainActivity extends AppCompatActivity {
 
     private FirebaseAuth mAuth;
-    private ProgressBar progressBar;
+    private FirebaseFirestore db;
+    private FirebaseUser mCurrentUser;
 
-    private TextInputEditText email;
-    private TextInputEditText senha;
+    private ProgressBar progressBar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,94 +30,52 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         mAuth = FirebaseAuth.getInstance();
+        db = FirebaseFirestore.getInstance();
+        mCurrentUser = mAuth.getCurrentUser();
 
-        progressBar = findViewById(R.id.progress_bar_login);
-        progressBar.setVisibility(View.INVISIBLE);
+        progressBar = findViewById(R.id.progress_main);
 
-        setupEditTexts();
-        setupRegistrarUsuario();
-        setupLoginButton();
+        setupUserInformationButton();
     }
 
-    private void setupEditTexts() {
-        email = findViewById(R.id.usuario);
-        senha = findViewById(R.id.senha);
-    }
-
-    private void setupLoginButton() {
-        Button loginButton = findViewById(R.id.login_button);
-
-        loginButton.setOnClickListener(v -> {
-            LoginModel login = getValuesFromFields();
-            if(login == null) {
-                return;
-            }
-
+    private void setupUserInformationButton() {
+        Button userInformation = findViewById(R.id.user_information_button);
+        userInformation.setOnClickListener(v -> {
             progressBar.setVisibility(View.VISIBLE);
-            loginButton.setEnabled(false);
-            mAuth.signInWithEmailAndPassword(login.getEmail(), login.getPassword())
-                    .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
-                        @Override
-                        public void onComplete(@NonNull Task<AuthResult> task) {
-                            if (task.isSuccessful()) {
-                                // Sign in success, update UI with the signed-in user's information
-                                Log.d("ACT", "Login realizado com sucesso");
-                                FirebaseUser user = mAuth.getCurrentUser();
+            getUserInformationFromFirebase();
+        });
+    }
 
-                                loginButton.setEnabled(true);
-                                progressBar.setVisibility(View.INVISIBLE);
+    private void getUserInformationFromFirebase() {
+        db.collection("users")
+                .get()
+                .addOnCompleteListener(task -> {
+                    progressBar.setVisibility(View.GONE);
+                    if (task.isSuccessful()) {
+                        for (QueryDocumentSnapshot document : task.getResult()) {
+                            UserModel mUser = document.toObject(UserModel.class);
 
-                                Toast.makeText(getApplicationContext(),
-                                        "Login realizado com sucesso", Toast.LENGTH_SHORT).show();
-                            } else {
-                                // If sign in fails, display a message to the user.
-                                Log.w("ACT", "signInWithEmail:failure", task.getException());
-                                loginButton.setEnabled(true);
-                                progressBar.setVisibility(View.INVISIBLE);
-                                Toast.makeText(getApplicationContext(),
-                                        task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                            if(mCurrentUser.getUid().equals(mUser.getId())) {
+                                callUserFragment(mUser);
                             }
                         }
-                    });
-        });
+                    } else {
+                        Toast.makeText(
+                                getApplicationContext(),
+                                "Erro ao carregar Usuário",
+                                Toast.LENGTH_LONG).show();
 
-
+                        Log.w("MAIN_ACTIVITY", "Erro ao carregar Usuário", task.getException());
+                    }
+                });
     }
 
-    private LoginModel getValuesFromFields() {
-        if(validateFields()) {
-            LoginModel login = new LoginModel();
-            login.setEmail(email.getText().toString());
-            login.setPassword(senha.getText().toString());
+    private void callUserFragment(UserModel mUser) {
+        UserFragment userFragment = UserFragment.newInstance(mUser);
 
-            return login;
-        }
-
-        return null;
-    }
-
-    private boolean validateFields() {
-        if(email.getText().toString().isEmpty() ||
-                senha.getText().toString().isEmpty()) {
-            String error = "Campo obrigatório";
-
-            email.setError(error);
-            senha.setError(error);
-
-            return false;
-        }
-        return true;
-    }
-
-    private void setupRegistrarUsuario() {
-        View view = findViewById(R.id.registrar_layout);
-        view.setOnClickListener(v -> {
-            RegistrarUsuarioFragment registrarUsuarioFragment = new RegistrarUsuarioFragment();
-
-            FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
-            transaction.replace(R.id.registrar_usuario_fragment, registrarUsuarioFragment);
-            transaction.addToBackStack(null);
-            transaction.commit();
-        });
+        FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
+        transaction.replace(R.id.user_fragment, userFragment);
+        transaction.addToBackStack(null);
+        transaction.commit();
     }
 }
