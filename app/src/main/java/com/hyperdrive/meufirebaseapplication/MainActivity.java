@@ -3,6 +3,7 @@ package com.hyperdrive.meufirebaseapplication;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.FragmentTransaction;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -56,7 +57,8 @@ public class MainActivity extends AppCompatActivity {
                             UserModel mUser = document.toObject(UserModel.class);
 
                             if(mCurrentUser.getUid().equals(mUser.getId())) {
-                                callUserFragment(mUser);
+                                Log.e("MAIN", document.getId());
+                                callUserFragment(mUser, document.getId());
                             }
                         }
                     } else {
@@ -70,8 +72,8 @@ public class MainActivity extends AppCompatActivity {
                 });
     }
 
-    private void callUserFragment(UserModel mUser) {
-        UserFragment userFragment = UserFragment.newInstance(mUser);
+    private void callUserFragment(UserModel mUser, String id) {
+        UserFragment userFragment = UserFragment.newInstance(mUser, id);
 
         FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
         transaction.replace(R.id.user_fragment, userFragment);

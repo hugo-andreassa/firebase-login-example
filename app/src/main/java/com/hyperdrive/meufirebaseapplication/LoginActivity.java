@@ -52,7 +52,9 @@ public class LoginActivity extends AppCompatActivity {
         Button loginButton = findViewById(R.id.login_button);
 
         loginButton.setOnClickListener(v -> {
-            LoginModel login = getValuesFromFields();
+            // LoginModel login = getValuesFromFields();
+            LoginModel login = new LoginModel("hugo.andreassa@gmail.com", "123456");
+
             if(login == null) {
                 return;
             }

@@ -1,5 +1,8 @@
 package com.hyperdrive.meufirebaseapplication;
 
+import android.annotation.SuppressLint;
+import android.content.Intent;
+import android.location.Location;
 import android.os.Bundle;
 
 import androidx.fragment.app.Fragment;
@@ -13,11 +16,14 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.hyperdrive.meufirebaseapplication.models.LoginModel;
 import com.hyperdrive.meufirebaseapplication.models.UserModel;
 
 import java.util.HashMap;
@@ -26,10 +32,15 @@ import java.util.Map;
 public class UserFragment extends Fragment {
 
     private static final String ARG_PARAM1 = "user";
+    private static final String ARG_PARAM2 = "id";
     private UserModel mUser;
+    private String mDocumentId;
 
     private FirebaseAuth mAuth;
     private FirebaseFirestore db;
+
+    private FusedLocationProviderClient mFusedLocationClient;
+    protected Location mLastLocation;
 
     private TextInputEditText name;
     private TextInputEditText email;
@@ -49,10 +60,11 @@ public class UserFragment extends Fragment {
 
     }
 
-    public static UserFragment newInstance(UserModel mUser) {
+    public static UserFragment newInstance(UserModel mUser, String id) {
         UserFragment fragment = new UserFragment();
         Bundle args = new Bundle();
         args.putSerializable(ARG_PARAM1, mUser);
+        args.putString(ARG_PARAM2, id);
         fragment.setArguments(args);
         return fragment;
     }
@@ -62,6 +74,7 @@ public class UserFragment extends Fragment {
         super.onCreate(savedInstanceState);
         if (getArguments() != null) {
             mUser = (UserModel) getArguments().getSerializable(ARG_PARAM1);
+            mDocumentId = getArguments().getString(ARG_PARAM2);
         }
     }
 
@@ -74,25 +87,56 @@ public class UserFragment extends Fragment {
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
 
+        try {
+            mFusedLocationClient = LocationServices.getFusedLocationProviderClient(getActivity());
+        } catch (Exception e) {
+            Toast.makeText(getContext(), "Erro ao carregar a localização",Toast.LENGTH_LONG);
+        }
+
         progressBar = view.findViewById(R.id.progress_bar);
 
         setupEditTexts(view);
-        if(mUser == null) {
-            setupRegistrarButton(view);
-            setupIncrementButtons(view);
-        } else {
+        setupIncrementButtons(view);
+        if (mUser != null) {
             loadFieldsInformation(view);
+            setupUpdateButton(view);
+            setupDeleteButton(view);
+        } else {
+            setupRegistrarButton(view);
         }
 
         return view;
+    }
+
+    @SuppressLint("MissingPermission")
+    private void getLastLocation() {
+        if(mFusedLocationClient == null) {
+            Toast.makeText(getContext(), "Erro ao obter localização", Toast.LENGTH_LONG);
+            geographicPoint = "";
+            return;
+        }
+
+        mFusedLocationClient.getLastLocation()
+                .addOnCompleteListener(getActivity(), task -> {
+                    if (task.isSuccessful() && task.getResult() != null) {
+                        mLastLocation = task.getResult();
+                        geographicPoint = mLastLocation.getLatitude() + " " + mLastLocation.getLongitude();
+                    } else {
+                        geographicPoint = "";
+                        Toast.makeText(getContext(), "Erro ao obter localização", Toast.LENGTH_LONG);
+                    }
+                });
     }
 
     private void loadFieldsInformation(View view) {
         email.setText(mUser.getEmail());
         phone.setText(mUser.getPhone());
 
-        TextInputLayout layout = view.findViewById(R.id.new_senha_layout);
-        layout.setVisibility(View.GONE);
+        TextInputLayout emailLayout = view.findViewById(R.id.new_usuario_layout);
+        emailLayout.setVisibility(View.GONE);
+
+        TextInputLayout passwordLayout = view.findViewById(R.id.new_senha_layout);
+        passwordLayout.setVisibility(View.GONE);
 
         name.setText(mUser.getName());
         street.setText(mUser.getStreet());
@@ -146,6 +190,7 @@ public class UserFragment extends Fragment {
     }
 
     private UserModel getValuesFromFields() {
+        getLastLocation();
 
         if(validateFields()) {
             UserModel user = new UserModel();
@@ -167,12 +212,50 @@ public class UserFragment extends Fragment {
         return null;
     }
 
-    private boolean validateFields() {
+    private UserModel getValuesFromFieldsToUpdate() {
+        getLastLocation();
 
+        if(validateFieldsUpdate()) {
+            UserModel user = new UserModel();
+            user.setEmail(email.getText().toString());
+            user.setPhone(phone.getText().toString());
+            user.setPassword(password.getText().toString());
+            user.setName(name.getText().toString());
+            user.setBirthdayMonth(birthdayMonth.toString());
+            user.setStreet(street.getText().toString());
+            user.setCity(city.getText().toString());
+            user.setNumber(number.getText().toString());
+            user.setComp(comp.getText().toString());
+            user.setCep(cep.getText().toString());
+            user.setGeographicPoint(geographicPoint);
+
+            return user;
+        }
+
+        return null;
+    }
+
+    private boolean validateFields() {
         if(email.getText().toString().isEmpty() ||
             name.getText().toString().isEmpty() ||
                 phone.getText().toString().isEmpty() ||
                     password.getText().toString().isEmpty()) {
+            String error = "Campo obrigatório";
+
+            email.setError(error);
+            name.setError(error);
+            phone.setError(error);
+            password.setError(error);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private boolean validateFieldsUpdate() {
+        if(name.getText().toString().isEmpty() ||
+                phone.getText().toString().isEmpty()) {
             String error = "Campo obrigatório";
 
             email.setError(error);
@@ -199,18 +282,71 @@ public class UserFragment extends Fragment {
             progressBar.setVisibility(View.VISIBLE);
             registrar.setEnabled(false);
 
-            setUserLoginWithEmail(user, registrar, progressBar);
+            setUserLoginWithEmail(user, registrar);
         });
     }
 
-    private void setUserLoginWithEmail(UserModel user, Button registrar, ProgressBar progressBar){
+    private void setupUpdateButton(View view) {
+        Button updateButton = view.findViewById(R.id.cadastrar_button);
+        updateButton.setText("Atualizar");
+        updateButton.setVisibility(View.VISIBLE);
+
+        updateButton.setOnClickListener(v -> {
+            UserModel user = getValuesFromFieldsToUpdate();
+            if (user == null) {
+                return;
+            }
+
+            progressBar.setVisibility(View.VISIBLE);
+
+            updateUserInFireCloud(user);
+        });
+    }
+
+    private void updateUserInFireCloud(UserModel user) {
+        Map<String, Object> userMap = new HashMap<>();
+        userMap.put("name", user.getName());
+        userMap.put("phone", user.getPhone());
+        userMap.put("birthdayMonth", user.getBirthdayMonth());
+        userMap.put("cep", user.getCep());
+        userMap.put("city", user.getCity());
+        userMap.put("comp", user.getComp());
+        userMap.put("street", user.getStreet());
+        userMap.put("number", user.getNumber());
+        userMap.put("geographicPoint", user.getGeographicPoint());
+
+        db.collection("users")
+                .document(mDocumentId)
+                .update(userMap)
+                .addOnSuccessListener(documentReference -> {
+                    progressBar.setVisibility(View.GONE);
+                    Toast.makeText(getContext(), "Dados atualizados com sucesso",
+                            Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    progressBar.setVisibility(View.GONE);
+                    Toast.makeText(getContext(), "Erro ao atualizar os dados",
+                            Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void setupDeleteButton(View view) {
+        Button deleteButton = view.findViewById(R.id.delete_button);
+        deleteButton.setVisibility(View.VISIBLE);
+
+        deleteButton.setOnClickListener(v -> {
+            deleteUserFromAuthentication();
+        });
+    }
+
+    private void setUserLoginWithEmail(UserModel user, Button registrar){
         mAuth.createUserWithEmailAndPassword(user.getEmail(), user.getPassword())
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {
                         FirebaseUser userFire = mAuth.getCurrentUser();
                         user.setId(userFire.getUid());
 
-                        setUserToFireCloud(user, registrar, progressBar);
+                        setUserToFireCloud(user, registrar);
                     } else {
                         progressBar.setVisibility(View.INVISIBLE);
                         registrar.setEnabled(true);
@@ -221,7 +357,7 @@ public class UserFragment extends Fragment {
                 });
     }
 
-    private void setUserToFireCloud(UserModel user, Button registrar, ProgressBar progressBar) {
+    private void setUserToFireCloud(UserModel user, Button registrar) {
         Map<String, Object> userMap = new HashMap<>();
         userMap.put("id", user.getId());
         userMap.put("name", user.getName());
@@ -253,5 +389,39 @@ public class UserFragment extends Fragment {
                     Toast.makeText(getContext(), "Erro ao inserir os dados",
                             Toast.LENGTH_SHORT).show();
                 });
+    }
+
+    private void deleteUserFromAuthentication() {
+        mAuth.getCurrentUser()
+                .delete()
+                .addOnCompleteListener(documentReference -> {
+                    deleteUserFromFireCloud();
+                })
+                .addOnFailureListener(e -> {
+                    progressBar.setVisibility(View.GONE);
+                    Toast.makeText(getContext(), "Erro ao deletar os dados",
+                            Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void deleteUserFromFireCloud() {
+        db.collection("users")
+                .document(mDocumentId)
+                .delete()
+                .addOnSuccessListener(documentReference -> {
+                    progressBar.setVisibility(View.GONE);
+                    callLoginActivity();
+                })
+                .addOnFailureListener(e -> {
+                    progressBar.setVisibility(View.GONE);
+                    Toast.makeText(getContext(), "Erro ao deletar os dados",
+                            Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void callLoginActivity() {
+        Intent intent = new Intent(getActivity(), LoginActivity.class);
+        startActivity(intent);
+        getActivity().finish();
     }
 }

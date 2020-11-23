@@ -195,6 +195,16 @@
                 android:layout_marginTop="50dp"
                 android:padding="10dp"/>
 
+            <Button
+                android:id="@+id/delete_button"
+                android:text="Deletar"
+                android:visibility="gone"
+                android:background="#c0251c"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="15dp"
+                android:padding="10dp"/>
+
             <ProgressBar
                 android:id="@+id/progress_bar"
                 android:visibility="gone"
